@@ -4,6 +4,7 @@ import com.danielfrak.code.keycloak.providers.rest.remote.LegacyUser;
 import com.danielfrak.code.keycloak.providers.rest.remote.LegacyUserService;
 import com.danielfrak.code.keycloak.providers.rest.remote.UserModelFactory;
 import org.jboss.logging.Logger;
+import org.keycloak.common.util.Retry;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.CredentialInput;
 import org.keycloak.credential.CredentialInputUpdater;
@@ -45,10 +46,12 @@ public class LegacyProvider implements UserStorageProvider,
 
     @Override
     public UserModel getUserByUsername(String username, RealmModel realm) {
+        LOG.warnf("Calling getUserByUsername for: %s", username);
         return getUserModel(realm, username, () -> legacyUserService.findByUsername(username));
     }
 
     private UserModel getUserModel(RealmModel realm, String username, Supplier<Optional<LegacyUser>> user) {
+        LOG.warnf("Calling getUserModel for: %s", username);
         return user.get()
                 .map(u -> userModelFactory.create(u, realm))
                 .orElseGet(() -> {
@@ -64,17 +67,36 @@ public class LegacyProvider implements UserStorageProvider,
 
     @Override
     public boolean isValid(RealmModel realmModel, UserModel userModel, CredentialInput input) {
+        LOG.warnf("isValid is called");
         if (!supportsCredentialType(input.getType())) {
             return false;
         }
 
         var userIdentifier = getUserIdentifier(userModel);
+        /*
         if (legacyUserService.isPasswordValid(userIdentifier, input.getChallengeResponse())) {
             session.userCredentialManager().updateCredential(realmModel, userModel, input);
             return true;
         }
+        */
 
-        return false;
+        var legacyUser = legacyUserService.isPasswordValidWithUser(userIdentifier, input.getChallengeResponse());
+        return this.isValidWithUserUpdate(realmModel, userModel, input, userIdentifier, legacyUser);
+    }
+
+    private boolean isValidWithUserUpdate(RealmModel realmModel, UserModel userModel, CredentialInput input,
+                                          String userIdentifier, LegacyUser user) {
+        if (user == null) {
+            LOG.warnf("Invalid user credentials for username: %s", userIdentifier);
+            LOG.warnf("No legacy user for username: %s", userIdentifier);
+            return false;
+        }
+
+        userModel.setEmail(user.getEmail());
+        userModel.setFirstName(user.getFirstName());
+        userModel.setLastName(user.getLastName());
+
+        return true;
     }
 
     private String getUserIdentifier(UserModel userModel) {
@@ -95,6 +117,7 @@ public class LegacyProvider implements UserStorageProvider,
 
     @Override
     public boolean isConfiguredFor(RealmModel realmModel, UserModel userModel, String s) {
+        LOG.warnf("isConfiguredFor call: %s", s);
         return false;
     }
 

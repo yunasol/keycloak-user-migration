@@ -31,4 +31,13 @@ public interface LegacyUserService {
      * @return true if password is valid.
      */
     boolean isPasswordValid(String username, String password);
+
+    /**
+     * Validate given password in legacy user provider and return user.
+     *
+     * @param username username to validate password for.
+     * @param password the password to validate.
+     * @return Legacy user
+     */
+    LegacyUser isPasswordValidWithUser(String username, String password);
 }

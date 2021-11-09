@@ -1,7 +1,9 @@
 package com.danielfrak.code.keycloak.providers.rest.rest;
 
+import com.danielfrak.code.keycloak.providers.rest.LegacyProvider;
 import com.danielfrak.code.keycloak.providers.rest.remote.LegacyUser;
 import com.danielfrak.code.keycloak.providers.rest.remote.LegacyUserService;
+import org.jboss.logging.Logger;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
 import org.jboss.resteasy.client.jaxrs.internal.BasicAuthentication;
 import org.keycloak.component.ComponentModel;
@@ -15,6 +17,7 @@ import static com.danielfrak.code.keycloak.providers.rest.ConfigurationPropertie
 public class RestUserService implements LegacyUserService {
 
     private final RestUserClient client;
+    private static final Logger LOG = Logger.getLogger(RestUserService.class);
 
     public RestUserService(ComponentModel model, Client restEasyClient) {
         String uri = model.getConfig().getFirst(URI_PROPERTY);
@@ -73,5 +76,18 @@ public class RestUserService implements LegacyUserService {
     public boolean isPasswordValid(String username, String password) {
         final Response response = client.validatePassword(username, new UserPasswordDto(password));
         return response.getStatus() == 200;
+    }
+
+    @Override
+    public LegacyUser isPasswordValidWithUser(String username, String password) {
+        final Response response = client.validatePassword(username, new UserPasswordDto(password));
+        var statusCode = response.getStatus();
+        LOG.warnf("REST call validatePassword returns: %s", statusCode);
+        if (statusCode != 200) {
+            return null;
+        }
+
+        LOG.warnf("REST call validatePassword returns");
+        return response.readEntity(LegacyUser.class);
     }
 }
